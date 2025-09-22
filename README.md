@@ -1,8 +1,8 @@
-# Straico Discord Bot - Modular Architecture
+# Straico Discord Bot
 
-A well-architected Discord bot for AI interactions with a modular plugin system.
+Discord bot for AI interactions with a modular plugin system.
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 src/
@@ -14,7 +14,7 @@ src/
 └── 🚀 main.py         # Application entry point
 ```
 
-## ✨ Features
+## Features
 
 - **Modular Plugin System**: Easy to add new commands
 - **Chat Completion**: AI conversations with context
@@ -24,7 +24,7 @@ src/
 - **Model Selection**: Choose from 90+ AI models
 - **Conversation History**: Context-aware conversations
 
-## 🚀 Quick Start
+## Quick Start
 
 1. **Install Dependencies**
    ```bash
@@ -47,7 +47,7 @@ src/
 
 ### Chat Plugin
 - `!chat <message>` - AI conversation
-- `!model <name>` - Set preferred model
+- `!setmodel <name>` - Set preferred model
 - `!currentmodel` - Show current model
 
 ### Image Plugin
@@ -55,7 +55,7 @@ src/
 - `!genimage` - Step-by-step workflow
 - `!imagemodels` - List available models
 
-### Video Plugin
+### Video Plugin (Current not available)
 - `!video <prompt>` - Generate videos
 - `!status <id>` - Check generation status
 
@@ -116,29 +116,7 @@ src/
 
 The plugin is automatically loaded on bot restart!
 
-## 🎯 Architecture Benefits
-
-### 🔄 Modular Design
-- Independent, reusable components
-- Easy to add/remove features
-- Clear separation of concerns
-
-### 🧪 Testability
-- Individual components can be tested
-- Mock services for unit testing
-- Isolated error handling
-
-### 👥 Team Development
-- Multiple developers can work on different plugins
-- Reduced merge conflicts
-- Clear ownership boundaries
-
-### 📈 Scalability
-- Add features without touching core code
-- Plugin hot-reloading support
-- Resource isolation
-
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 ```bash
@@ -146,7 +124,7 @@ DISCORD_TOKEN=your_discord_bot_token
 STRAICO_API_KEY=your_straico_api_key
 COMMAND_PREFIX=!
 LOG_LEVEL=INFO
-MAX_HISTORY_PER_CHANNEL=50
+MAX_HISTORY_PER_CHANNEL=100
 ```
 
 ### Plugin Configuration
@@ -157,7 +135,7 @@ async def my_command(self, ctx):
     default_model = self.config.default_chat_model
 ```
 
-## 🛡️ Error Handling
+## Error Handling
 
 ### Custom Exceptions
 ```python
@@ -202,23 +180,13 @@ print(f'✅ {len(STRAICO_MODELS)} models loaded')
 "
 ```
 
-## 📚 Plugin Examples
+## Plugin Examples
 
 See the existing plugins for reference:
 - `src/plugins/chat/` - AI conversation handling
 - `src/plugins/image/` - Image generation workflow
 - `src/plugins/video/` - Video generation
 - `src/plugins/utility/` - Bot utilities
-
-## 🆙 Migration from Old Version
-
-The original `bot.py` still works, but the new modular version offers:
-- Better organization
-- Easier feature additions
-- Improved maintainability
-- Plugin system
-
-See `MIGRATION.md` for detailed migration instructions.
 
 ## 🤝 Contributing
 
