@@ -8,75 +8,56 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   sast:
+    name: Static Application Security Testing
     runs-on: ubuntu-latest
-    continue-on-error: true
+    continue-on-error: true   # ✅ still allows merging
 
     steps:
+      # --- Checkout code ---
       - uses: actions/checkout@v4
 
+      # --- Setup Python ---
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install tools
-        run: pip install bandit semgrep
-
-      # --- Pre-create empty SARIF files so they always exist ---
-      - name: Initialize empty SARIFs
+      # --- Install open-source tools ---
+      - name: Install Bandit and Semgrep
         run: |
-          echo '{"version":"2.1.0","runs":[]}' > bandit-report.sarif
-          echo '{"version":"2.1.0","runs":[]}' > semgrep-report.sarif
+          pip install bandit semgrep
 
-      # --- Bandit ---
+      # --- Run Bandit ---
       - name: Run Bandit
         run: |
           bandit -r . -ll -f json -o bandit-report.json || true
-          python3 - <<'EOF'
-          import json, pathlib
-          j = pathlib.Path("bandit-report.json")
-          s = pathlib.Path("bandit-report.sarif")
-          if j.exists() and j.stat().st_size > 0:
-              data = json.load(j.open())
-              sarif = {
-                  "version": "2.1.0",
-                  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-                  "runs": [{
-                      "tool": {"driver": {"name": "Bandit"}},
-                      "results": [{
-                          "ruleId": r.get("test_id"),
-                          "level": r.get("issue_severity", "note").lower(),
-                          "message": {"text": r.get("issue_text")},
-                          "locations": [{
-                              "physicalLocation": {
-                                  "artifactLocation": {"uri": r.get("filename")},
-                                  "region": {"startLine": r.get("line_number", 1)}
-                              }
-                          }]
-                      } for r in data.get("results", [])]
-                  }]
-              }
-              s.write_text(json.dumps(sarif, indent=2))
-          EOF
 
-      # --- Semgrep ---
+      # --- Run Semgrep ---
       - name: Run Semgrep
         run: |
           semgrep scan --config=auto --json > semgrep-report.json || true
-          semgrep scan --config=auto --sarif-output semgrep-report.sarif || echo "semgrep SARIF skipped"
 
-      # --- Verify files exist (debug aid) ---
-      - name: List generated files
+      # --- Show a summary of Bandit findings in logs ---
+      - name: Show Bandit summary
+        if: always()
         run: |
-          echo "Working directory: $(pwd)"
-          ls -lh *.json *.sarif || true
+          python3 - <<'EOF'
+          import json, pathlib
+          f = pathlib.Path('bandit-report.json')
+          if f.exists() and f.stat().st_size > 0:
+              data = json.load(f.open())
+              print("\n=== Bandit Findings Summary ===")
+              for issue in data.get('results', []):
+                  print(f"{issue['filename']}:{issue['line_number']} -> {issue['issue_severity']} - {issue['issue_text']}")
+          else:
+              print("No Bandit findings or report empty.")
+          EOF
 
-      # --- Upload artifacts ---
-      - name: Upload reports
+      # --- Upload reports as artifacts for download ---
+      - name: Upload SAST reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -84,14 +65,3 @@ jobs:
           path: |
             bandit-report.json
             semgrep-report.json
-            bandit-report.sarif
-            semgrep-report.sarif
-
-      # --- Upload SARIF to Security tab ---
-      - name: Upload SARIFs to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: |
-            bandit-report.sarif
-            semgrep-report.sarif
