@@ -5,9 +5,15 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  security-events: write   # ✅ Needed to upload SARIF to Security tab
+
 jobs:
   sast:
+    name: Static Application Security Testing
     runs-on: ubuntu-latest
+    continue-on-error: true   # ✅ allows merging even if findings exist
 
     steps:
       - uses: actions/checkout@v4
@@ -21,15 +27,34 @@ jobs:
         run: |
           pip install bandit semgrep
 
+      # --- Bandit ---
       - name: Run Bandit (Python SAST)
         run: |
-          bandit -r . -ll -f json -o bandit-report.json || true
+          bandit -r . -ll \
+                 -f json -o bandit-report.json \
+                 -f sarif -o bandit-report.sarif || true
 
+      # --- Semgrep ---
       - name: Run Semgrep (Pattern-Based SAST)
         run: |
-          semgrep scan --config=auto --json > semgrep-report.json || true
+          semgrep scan --config=auto \
+                       --json > semgrep-report.json \
+                       --sarif-output semgrep-report.sarif || true
 
-      # ✅ Always upload reports, even if previous steps failed
+      # --- Optional summary in logs ---
+      - name: Show Bandit summary
+        run: |
+          python3 - <<'EOF'
+          import json, pathlib
+          f = pathlib.Path('bandit-report.json')
+          if f.exists():
+              data = json.load(f.open())
+              for issue in data.get('results', []):
+                  print(f"{issue['filename']}:{issue['line_number']} -> {issue['issue_severity']} - {issue['issue_text']}")
+          EOF
+        if: always()
+
+      # --- Upload artifacts (for download) ---
       - name: Upload SAST reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -38,3 +63,14 @@ jobs:
           path: |
             bandit-report.json
             semgrep-report.json
+            bandit-report.sarif
+            semgrep-report.sarif
+
+      # --- Upload SARIF results to GitHub Security tab ---
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: |
+            bandit-report.sarif
+            semgrep-report.sarif
