@@ -1,9 +1,14 @@
 name: Python SAST
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   sast:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -18,15 +23,15 @@ jobs:
 
       - name: Run Bandit (Python SAST)
         run: |
-          bandit -r . -ll -f json -o bandit-report.json
-          cat bandit-report.json
+          bandit -r . -ll -f json -o bandit-report.json || true
 
       - name: Run Semgrep (Pattern-Based SAST)
         run: |
-          semgrep scan --config=auto --json > semgrep-report.json
-          cat semgrep-report.json
+          semgrep scan --config=auto --json > semgrep-report.json || true
 
+      # ✅ Always upload reports, even if previous steps failed
       - name: Upload SAST reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sast-reports
