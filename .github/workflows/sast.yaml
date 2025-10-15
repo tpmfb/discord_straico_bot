@@ -8,16 +8,16 @@ on:
 
 permissions:
   contents: read
-  security-events: write   # needed for SARIF upload
+  security-events: write   # Required for GitHub Security tab
 
 jobs:
   sast:
     name: Static Application Security Testing
     runs-on: ubuntu-latest
-    continue-on-error: true   # ✅ still allows merging
+    continue-on-error: true   # ✅ still allows merge
 
     steps:
-      # --- Checkout code ---
+      # --- Checkout repo ---
       - uses: actions/checkout@v4
 
       # --- Setup Python ---
@@ -26,22 +26,23 @@ jobs:
         with:
           python-version: '3.11'
 
-      # --- Install open-source SAST tools ---
-      - name: Install Bandit and Semgrep
+      # --- Install Bandit and Semgrep ---
+      - name: Install SAST tools
         run: |
           pip install bandit semgrep
 
-      # --- Run Bandit ---
-      - name: Run Bandit (Python SAST)
+      # --- Run Bandit (with guaranteed SARIF creation) ---
+      - name: Run Bandit
         run: |
-          # Run Bandit and save JSON output
           bandit -r . -ll -f json -o bandit-report.json || true
 
-          # Convert JSON → SARIF if Bandit SARIF output not supported
           python3 - <<'EOF'
           import json, pathlib
           src = pathlib.Path("bandit-report.json")
-          if src.exists() and src.stat().st_size > 0:
+          sarif_path = pathlib.Path("bandit-report.sarif")
+          if not src.exists() or src.stat().st_size == 0:
+              sarif_path.write_text('{"version":"2.1.0","runs":[]}')
+          else:
               data = json.load(src.open())
               sarif = {
                   "version": "2.1.0",
@@ -61,18 +62,23 @@ jobs:
                       } for i in data.get("results", [])]
                   }]
               }
-              pathlib.Path("bandit-report.sarif").write_text(json.dumps(sarif, indent=2))
-          else:
-              pathlib.Path("bandit-report.sarif").write_text('{"version":"2.1.0","runs":[]}')
+              sarif_path.write_text(json.dumps(sarif, indent=2))
           EOF
 
-      # --- Run Semgrep ---
-      - name: Run Semgrep (Pattern-Based SAST)
+      # --- Run Semgrep (with guaranteed SARIF creation) ---
+      - name: Run Semgrep
         run: |
           semgrep scan --config=auto --json > semgrep-report.json || true
+
+          # Create SARIF safely
           semgrep scan --config=auto --sarif-output semgrep-report.sarif || true
 
-      # --- Show summary in logs ---
+          # If SARIF not created, make empty one
+          if [ ! -f semgrep-report.sarif ]; then
+            echo '{"version":"2.1.0","runs":[]}' > semgrep-report.sarif
+          fi
+
+      # --- Show Bandit summary ---
       - name: Show Bandit summary
         if: always()
         run: |
@@ -85,10 +91,10 @@ jobs:
               for issue in data.get('results', []):
                   print(f"{issue['filename']}:{issue['line_number']} -> {issue['issue_severity']} - {issue['issue_text']}")
           else:
-              print("No Bandit findings or report empty.")
+              print("No Bandit findings or empty report.")
           EOF
 
-      # --- Upload all reports as artifacts ---
+      # --- Upload reports as artifacts ---
       - name: Upload SAST reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -100,8 +106,8 @@ jobs:
             bandit-report.sarif
             semgrep-report.sarif
 
-      # --- Upload SARIF to GitHub Security tab ---
-      - name: Upload SARIF to GitHub Security
+      # --- Upload to GitHub Security tab ---
+      - name: Upload SARIF results
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
