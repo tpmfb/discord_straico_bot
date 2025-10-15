@@ -55,7 +55,7 @@ src/
 - `!genimage` - Step-by-step workflow
 - `!imagemodels` - List available models
 
-### Video Plugin (Current not available)
+### Video Plugin (Currently not available)
 - `!video <prompt>` - Generate videos
 - `!status <id>` - Check generation status
 
